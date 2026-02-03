@@ -1,0 +1,647 @@
+{
+  "metadata": {
+    "dimension": "temporal_numerical",
+    "description": "Sentences with planning horizons mapped to discrete numerical time labels. Each sample has a template with a blank (___) and a list of plausible time labels.",
+    "n_samples": 156,
+    "time_labels": {
+      "0": "now",
+      "1": "one day",
+      "2": "one week",
+      "3": "two weeks",
+      "4": "one month",
+      "5": "half a year",
+      "6": "one year",
+      "7": "5 years",
+      "8": "10 years",
+      "9": "100 years"
+    },
+    "version": "1.0",
+    "created_date": "2026-01-31"
+  },
+  "samples": [
+    {
+      "template": "I want to take a vacation in ___.",
+      "labels": [2, 3, 4, 5, 6]
+    },
+    {
+      "template": "I need to finish this report by ___.",
+      "labels": [0, 1, 2, 3]
+    },
+    {
+      "template": "I plan to retire in ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I should reply to this email within ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I want to learn a new language within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I need to buy groceries within ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I plan to buy a house in ___.",
+      "labels": [5, 6, 7, 8]
+    },
+    {
+      "template": "I want to finish reading this book within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to schedule a dentist appointment within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I plan to start a business in ___.",
+      "labels": [4, 5, 6, 7]
+    },
+    {
+      "template": "I want to run a marathon in ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "I need to do the laundry within ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I plan to get a PhD in ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "I should call my parents within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I want to lose 20 pounds within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "I need to pay this bill by ___.",
+      "labels": [0, 1, 2, 3, 4]
+    },
+    {
+      "template": "I plan to move to a new city in ___.",
+      "labels": [4, 5, 6, 7]
+    },
+    {
+      "template": "I want to cook dinner within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I need to submit this job application by ___.",
+      "labels": [0, 1, 2, 3]
+    },
+    {
+      "template": "I plan to write a novel within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to fix this bug within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to renew my passport within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I plan to save enough for a down payment in ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to take a nap within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I need to clean the house within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to travel the world within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to get a promotion within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I need to water the plants within ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I plan to learn to play the piano within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to finish this puzzle within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to get an oil change within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I plan to have children in ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to redecorate my room within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I need to file my taxes by ___.",
+      "labels": [2, 3, 4]
+    },
+    {
+      "template": "I plan to pay off my student loans in ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to eat lunch within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I need to mow the lawn within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to build a cabin in the woods within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "I want to organize my closet within ___.",
+      "labels": [0, 1, 2, 3]
+    },
+    {
+      "template": "I need to prepare for the presentation by ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to switch careers in ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to bake a cake within ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I need to return this package by ___.",
+      "labels": [0, 1, 2, 3]
+    },
+    {
+      "template": "I plan to earn a million dollars within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "I want to go for a walk within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I need to finish this online course within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I plan to master chess within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to catch up with an old friend within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to fix the leaking faucet within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to adopt a pet in ___.",
+      "labels": [2, 3, 4, 5, 6]
+    },
+    {
+      "template": "I want to meditate within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I need to find a new apartment within ___.",
+      "labels": [3, 4, 5]
+    },
+    {
+      "template": "I plan to publish a research paper within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to watch this movie within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to update my resume within ___.",
+      "labels": [0, 1, 2, 3]
+    },
+    {
+      "template": "I plan to plant a garden in ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I want to try that new restaurant within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to charge my phone within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I plan to become fluent in Spanish within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "I want to donate blood within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to back up my computer within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to renovate the kitchen in ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "I want to complete a triathlon within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I need to pick up my prescription within ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I plan to start a family in ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to take a photography class within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I need to send this thank-you card by ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to get my pilot's license within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to rearrange the furniture within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to study for the exam within ___.",
+      "labels": [1, 2, 3]
+    },
+    {
+      "template": "I plan to open a retirement account within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I want to deep clean the bathroom within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to replace the car tires within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I plan to climb Mount Everest within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "I want to listen to that podcast within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to set up a doctor's appointment within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I plan to build an emergency fund within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to sort through old photos within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to defrost the freezer within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to write my memoir within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to attend a concert within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I need to sharpen the kitchen knives within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to achieve financial independence within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "I want to go camping within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "I need to change the air filters within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I plan to learn to sail within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "I want to frame these pictures within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to cancel that subscription by ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I plan to get a master's degree within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "I want to reorganize the garage within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to walk the dog within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I plan to restore a vintage car within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "I want to start journaling within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "I need to proofread this essay by ___.",
+      "labels": [0, 1]
+    },
+    {
+      "template": "I plan to build a treehouse within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "I want to visit my grandparents within ___.",
+      "labels": [1, 2, 3, 4, 5]
+    },
+    {
+      "template": "I need to take out the trash within ___.",
+      "labels": [0]
+    },
+    {
+      "template": "I plan to establish a nonprofit within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "I want to paint the bedroom within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "I need to assemble this furniture within ___.",
+      "labels": [0, 1, 2]
+    },
+    {
+      "template": "Humanity will colonize another planet within ___.",
+      "labels": [8, 9]
+    },
+    {
+      "template": "The effects of climate change will fully reverse within ___.",
+      "labels": [8, 9]
+    },
+    {
+      "template": "The government will pass this legislation within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The city will complete the new highway within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "The administration plans to implement this policy within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The country will hold its next general election within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "The municipality will update its zoning regulations within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "Congress will approve the budget by ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The government will significantly reduce the national debt within ___.",
+      "labels": [7, 8, 9]
+    },
+    {
+      "template": "The state will build a new public transit system within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "The country will ratify this international treaty within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "The census data will be fully processed within ___.",
+      "labels": [5, 6]
+    },
+    {
+      "template": "A constitutional amendment will be ratified within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "The government will declassify these documents within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "The city will issue new building permits within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The regulatory agency will complete its investigation within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The embassy will process these visa applications within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The company will launch this product within ___.",
+      "labels": [3, 4, 5, 6]
+    },
+    {
+      "template": "The startup will reach profitability within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "The firm will complete the merger within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The board will appoint a new CEO within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The corporation will open its new headquarters within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "The company plans to IPO within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "The brand will complete its rebrand within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The team will ship this software update within ___.",
+      "labels": [1, 2, 3, 4]
+    },
+    {
+      "template": "The company will expand to international markets within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "The accounting firm will complete the audit within ___.",
+      "labels": [2, 3, 4]
+    },
+    {
+      "template": "The company will file quarterly earnings within ___.",
+      "labels": [2, 3, 4]
+    },
+    {
+      "template": "The factory will reach full production capacity within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The retailer will clear its remaining inventory within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The corporation will achieve carbon neutrality within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "The tech company will deprecate this API within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The research team will publish their findings within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "Scientists will develop a vaccine for this disease within ___.",
+      "labels": [6, 7, 8]
+    },
+    {
+      "template": "The clinical trial will be completed within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "The telescope will capture its first images within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "Researchers will sequence this organism's genome within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The particle accelerator will be operational within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "Scientists will achieve commercial nuclear fusion within ___.",
+      "labels": [8, 9]
+    },
+    {
+      "template": "The Mars rover mission will conclude within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "Researchers will map the entire ocean floor within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "The archaeological dig will be completed within ___.",
+      "labels": [5, 6, 7]
+    },
+    {
+      "template": "Scientists will prove or disprove this conjecture within ___.",
+      "labels": [7, 8, 9]
+    },
+    {
+      "template": "The lab will synthesize this new material within ___.",
+      "labels": [4, 5, 6]
+    },
+    {
+      "template": "The peer review process will be completed within ___.",
+      "labels": [2, 3, 4, 5]
+    },
+    {
+      "template": "The space probe will reach its destination within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "Researchers will develop a cure for Alzheimer's within ___.",
+      "labels": [7, 8, 9]
+    },
+    {
+      "template": "The bridge construction will be completed within ___.",
+      "labels": [6, 7]
+    },
+    {
+      "template": "The dam will be decommissioned within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "The reforestation effort will restore this ecosystem within ___.",
+      "labels": [7, 8, 9]
+    },
+    {
+      "template": "This radioactive waste will fully decay within ___.",
+      "labels": [9]
+    },
+    {
+      "template": "The coral reef will recover from bleaching within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "The power grid will transition to renewable energy within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "This glacier will recede to half its current size within ___.",
+      "labels": [8, 9]
+    },
+    {
+      "template": "The landfill will reach capacity within ___.",
+      "labels": [7, 8]
+    },
+    {
+      "template": "This species will recover from endangered status within ___.",
+      "labels": [7, 8, 9]
+    }
+  ]
+}
