@@ -1,0 +1,198 @@
+\section{Activation Steering of Temporal Discounting}
+\label{sec:caa-steering}
+
+The few-shot calibration results (Section~\ref{sec:fewshot-results}) demonstrated that the model's temporal preferences can be shifted via distributional cues in the prompt. However, this operates at the \emph{input} level---the model's internal representations are unchanged. We now ask whether temporal discounting can be steered at the \emph{representation} level by directly intervening on the model's residual stream during inference.
+
+\subsection{Contrastive Activation Addition (CAA)}
+\label{sec:caa-method}
+
+We use Contrastive Activation Addition \citep{turner2024steering}, a technique that computes a \emph{steering vector} from the difference in mean activations between two sets of prompts, then adds a scaled version of this vector to the residual stream during generation. The procedure is:
+
+\begin{enumerate}
+    \item \textbf{Dataset.} We use 300 implicit temporal-scope pairs, where each pair consists of a question with an immediate-framing completion and a long-term-framing completion. The temporal scope is implied rather than stated with surface time-words (e.g., ``quick fix'' vs.\ ``sustainable plan''), so the resulting vector captures the \emph{concept} of temporal scope rather than vocabulary artifacts.
+    \item \textbf{Activation extraction.} For each prompt, we extract the last-token residual-stream activation at every layer of Qwen3-4B-Instruct-2507, yielding tensors of shape $[n, n_{\text{layers}}, d_{\text{model}}]$.
+    \item \textbf{Probing.} We train a logistic regression probe ($C = 0.1$) per layer on an 80/20 pair-aware split of the implicit activations. Cross-dataset validation on 500 explicit temporal-scope pairs confirms that the probe generalizes. Layer~22 achieves the highest test accuracy on both datasets.
+    \item \textbf{Vector extraction.} At layer~22, we compute:
+    \begin{equation}
+        \mathbf{v}_{\text{CAA}} = \bar{\mathbf{a}}_{\text{long-term}} - \bar{\mathbf{a}}_{\text{immediate}}
+    \end{equation}
+    and normalize to unit $L_2$ norm. This vector points in the direction the model's representations move when encoding long-term (vs.\ immediate) temporal scope.
+    \item \textbf{Steering.} During generation, we add $\alpha \cdot \mathbf{v}_{\text{CAA}}$ to the residual stream at layer~22 after each forward pass. Positive $\alpha$ pushes toward long-term framing (hypothesized to increase impatience on the MCQ-27, since the ``long-term'' direction may make the model perceive the delay as more salient); negative $\alpha$ pushes toward immediate framing.
+\end{enumerate}
+
+\subsection{Behavioral Layer Sweep}
+
+Before applying the CAA vector to the MCQ-27, we validated it on held-out explicit temporal-scope prompts. For each (layer, $\alpha$) pair, we measured the shift in log-probability between the long-term and immediate completions. Layer~22 with $\alpha \geq 20$ produced the strongest and most reliable shifts, confirming the probing result. An extended sweep over layers~19--25 with $\alpha \in \{20, 30, 40, 50\}$ and a generation quality check (open-ended prompts at increasing $\alpha$) confirmed that layer~22 offers the best trade-off between steering strength and output coherence.
+
+\subsection{CAA Steering on the Kirby MCQ-27}
+\label{sec:caa-kirby}
+
+We applied the CAA vector at layer~22 to the full 27-item MCQ-27 under the same few-shot calibration format used in Section~\ref{sec:fewshot-results} (default-calibrated, 4 examples, now/now/later/later pattern). We tested $\alpha \in \{0, +10, +20, +30, +40, +50\}$ (positive steering) and $\alpha \in \{-10, -20, -30\}$ (negative steering), in both direct and thinking modes. Table~\ref{tab:caa-direct} presents the direct-mode results.
+
+\begin{table}[H]
+\centering
+\caption{CAA steering on the Kirby MCQ-27 (direct mode, layer~22, default few-shot calibration). The baseline ($\alpha = 0$) matches Section~\ref{sec:fewshot-results}. Human benchmarks from \citet{kirby1999}.}
+\label{tab:caa-direct}
+\begin{tabular}{rcccc}
+\toprule
+\textbf{$\alpha$} & \textbf{$k$} & \textbf{Consistency} & \textbf{Delayed} & \textbf{Now} \\
+\midrule
+0 (baseline) & 0.0098 & 96\% & 11/27 & 16/27 \\
+$+10$ & 0.0098 & 96\% & 11/27 & 16/27 \\
+$+20$ & 0.0098 & 96\% & 11/27 & 16/27 \\
+$+30$ & 0.0098 & 96\% & 11/27 & 16/27 \\
+$+40$ & 0.025 & 89\% & 9/27 & 18/27 \\
+$+50$ & 0.025 & 85\% & 8/27 & 19/27 \\
+\midrule
+$-10$ & 0.0098 & 93\% & 12/27 & 15/27 \\
+$-20$ & 0.0098 & 93\% & 14/27 & 13/27 \\
+$-30$ & 0.0098 & 93\% & 14/27 & 13/27 \\
+\midrule
+\multicolumn{2}{l}{Human controls} & 96\% & \multicolumn{2}{c}{$k = 0.013$} \\
+\multicolumn{2}{l}{Human heroin patients} & 94\% & \multicolumn{2}{c}{$k = 0.025$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Several patterns emerge:
+
+\paragraph{Threshold effect, not a smooth gradient.} Positive steering has \emph{no effect} at $\alpha \leq 30$: the model produces identical responses to the unsteered baseline on all 27 questions. At $\alpha = 40$, $k$ jumps discretely from 0.0098 to 0.025---matching the human heroin-user benchmark---and remains there at $\alpha = 50$, albeit with declining consistency (89\% $\to$ 85\%). There is no intermediate regime: the steering either has no behavioral effect or flips a discrete set of trials, producing an all-or-nothing shift.
+
+\paragraph{Negative steering is largely ineffective.} Steering in the negative direction (toward immediate framing) increases the number of ``later'' choices from 11/27 to 14/27 at $\alpha = -20$ and $-30$, but $k$ remains pinned at 0.0098. The additional ``later'' responses occur on trials where the model was already near its indifference point, and the shift is not large enough to move $k$ to the next candidate value in the Kirby scoring system. The few-shot format appears to create a floor below which the discount rate cannot easily be pushed.
+
+\paragraph{Thinking mode is identical.} Repeating the experiment with thinking mode enabled ($\alpha \in \{0, +20, +40, +50, -20, -30\}$) produces identical $k$ values to direct mode at every $\alpha$. As in Section~\ref{sec:thinking-mode}, the few-shot format suppresses reasoning entirely---the model emits bare ``now''/``later'' tokens regardless of whether steering is applied.
+
+\subsection{Interaction with Chain-of-Thought Prompting}
+\label{sec:caa-cot}
+
+The direct-mode results show that the few-shot format constrains the model so tightly that CAA steering can only produce a discrete jump at high $\alpha$. To test whether allowing the model to reason changes the dose-response relationship, we applied the same CAA vector under two chain-of-thought conditions: (a)~zero-shot CoT, where the model reasons from scratch with no few-shot examples, and (b)~few-shot CoT, where the system prompt requests reasoning but the few-shot examples retain the terse now/later format. In both conditions, generation used up to 200 tokens. Table~\ref{tab:caa-cot} presents the results.
+
+\begin{table}[H]
+\centering
+\caption{CAA steering under chain-of-thought prompting (layer~22). Zero-shot CoT uses a reasoning-eliciting system prompt with no few-shot examples. Few-shot CoT adds a reasoning instruction to the few-shot format from Section~\ref{sec:fewshot-method}.}
+\label{tab:caa-cot}
+\begin{tabular}{llrcc}
+\toprule
+\textbf{Condition} & \textbf{$\alpha$} & \textbf{$k$} & \textbf{Consistency} & \textbf{Delayed} \\
+\midrule
+Zero-shot CoT & $0$ & 0.026 & 85\% & 9/27 \\
+ & $+10$ & 0.250 & 89\% & 4/27 \\
+ & $+20$ & 0.250 & 100\% & 0/27 \\
+ & $+30$ & 0.250 & 89\% & 5/27 \\
+ & $+40$ & 0.250 & 78\% & 6/27 \\
+ & $+50$ & 0.250 & 81\% & 5/27 \\
+\cmidrule{2-5}
+ & $-10$ & 0.0016 & 78\% & 15/27 \\
+ & $-20$ & 0.0016 & 89\% & 19/27 \\
+ & $-30$ & 0.0098 & 78\% & 10/27 \\
+\midrule
+Few-shot CoT & $0$ & 0.0098 & 96\% & 11/27 \\
+ & $+10$ & 0.0098 & 96\% & 11/27 \\
+ & $+20$ & 0.025 & 89\% & 9/27 \\
+ & $+30$ & 0.025 & 89\% & 9/27 \\
+ & $+40$ & 0.127 & 85\% & 6/27 \\
+ & $+50$ & 0.250 & 93\% & 3/27 \\
+\cmidrule{2-5}
+ & $-10$ & 0.0098 & 96\% & 11/27 \\
+ & $-20$ & 0.0098 & 96\% & 11/27 \\
+ & $-30$ & 0.0098 & 96\% & 11/27 \\
+\midrule
+\multicolumn{2}{l}{Human controls} & 0.013 & 96\% & --- \\
+\multicolumn{2}{l}{Human heroin patients} & 0.025 & 94\% & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The interaction between steering and prompting format reveals three qualitatively distinct regimes:
+
+\paragraph{Zero-shot CoT is hypersensitive to steering.} Without few-shot anchoring, even $\alpha = +10$ sends $k$ from 0.026 to 0.250---the maximum possible value, corresponding to all-``now'' responses. At $\alpha = +20$, the model chooses ``now'' on \emph{every single question} with 100\% consistency. The steering vector does not merely bias the final token; it corrupts the reasoning chain itself, causing the model to generate increasingly extreme justifications for the immediate reward. Above $\alpha = +20$, consistency \emph{declines} as the perturbed reasoning becomes incoherent, with some answers flipping back to ``later'' for the wrong reasons.
+
+\paragraph{Negative steering works only in zero-shot CoT.} At $\alpha = -10$ and $-20$, the zero-shot CoT condition produces $k = 0.0016$---extreme patience, with 15--19/27 ``later'' responses. This is the \emph{only} condition across all experiments where negative steering produces a meaningful shift in $k$. The model's reasoning shifts toward long-term framing, generating statements about ``building wealth over time'' and ``the value of patience.'' However, at $\alpha = -30$, $k$ rebounds to 0.0098 as the steering becomes too strong and the reasoning degrades. By contrast, negative steering under the few-shot conditions (both direct and CoT) has no detectable effect at any $\alpha$.
+
+\paragraph{Few-shot CoT produces the smoothest dose-response.} The few-shot CoT condition is the only one that shows a graded, monotonic relationship between $\alpha$ and $k$:
+\begin{equation*}
+\alpha = 0 \;\to\; k = 0.010, \quad
++20 \;\to\; 0.025, \quad
++40 \;\to\; 0.13, \quad
++50 \;\to\; 0.25.
+\end{equation*}
+The transition from human-control-like ($k = 0.010$) through heroin-like ($k = 0.025$) to extreme impatience ($k = 0.25$) occurs across a range of $\alpha$ values, unlike the all-or-nothing jump in direct mode. The few-shot examples provide enough anchoring to prevent the catastrophic reasoning corruption seen in zero-shot CoT, while the CoT format provides enough flexibility for the steering to take effect at lower $\alpha$ values than in direct mode (the shift to $k = 0.025$ occurs at $\alpha = +20$ in few-shot CoT vs.\ $\alpha = +40$ in direct mode). However, negative steering remains completely ineffective, with $k$ locked at 0.0098 at all negative $\alpha$ values.
+
+\subsection{Discussion}
+
+\paragraph{CAA steering modulates temporal discounting, but asymmetrically.} The CAA vector trained on implicit temporal-scope data does produce measurable shifts in the model's discount rate on the MCQ-27. However, the effect is strongly asymmetric: positive steering (toward the ``long-term'' direction in activation space) consistently increases $k$ (more impatient behavior), while negative steering (toward ``immediate'') is almost entirely ineffective. This asymmetry may reflect the fact that the few-shot baseline already positions the model near a floor imposed by the distributional pattern of the in-context examples. Alternatively, the geometry of the model's temporal representations may be asymmetric, with the ``patience'' direction more tightly constrained by instruction tuning than the ``impatience'' direction.
+
+\subsubsection{Qualitative Analysis: Steering Corrupts Zero-Shot Reasoning}
+\label{sec:caa-reasoning}
+
+Inspection of the model's chain-of-thought output under zero-shot CoT reveals how CAA steering alters behavior: it does not merely flip the final answer token but reshapes the reasoning that precedes it. We present verbatim examples on Q4 (\$31 today vs.\ \$85 in 7 days, $k_{\text{indiff}} = 0.25$)---a trial where the delayed reward is nearly 3$\times$ the immediate reward with only a one-week delay.
+
+\paragraph{Baseline ($\alpha = 0$): correct deliberation, chooses LATER.}
+\begin{lstlisting}[style=cot]
+$31 today is a smaller amount now, but $85 in 7 days is
+significantly more. Since both are guaranteed and there's
+no risk, the larger sum in the future is clearly better.
+However, people often prefer immediate rewards due to
+present bias. But in this case, the future amount is more
+than double the present one. Even with a 7-day delay, the
+value of money is stable, and there's no inflation or risk
+involved. Therefore, the rational choice is to take the
+larger amount later.
+LATER
+\end{lstlisting}
+
+\paragraph{Steered at $\alpha = +10$: reasoning shifts to ``stability,'' chooses NOW.}
+\begin{lstlisting}[style=cot]
+$31 today offers immediate access to funds, which can be
+useful for short-term needs or financial flexibility. $85
+in 7 days provides a larger sum, but requires waiting.
+Given that both are guaranteed and the time gap is only
+7 days, the benefit of the larger amount is modest.
+However, the psychological advantage of having money
+today -- especially for stability and decision-making --
+makes it more appealing.
+NOW
+\end{lstlisting}
+
+\noindent At $\alpha = +10$, the model no longer acknowledges that the delayed reward is ``more than double.'' Instead, it characterizes a 174\% guaranteed return in one week as a ``modest'' benefit and invokes ``psychological advantage'' and ``stability'' to justify choosing \$31 over \$85.
+
+\paragraph{Steered at $\alpha = +20$: formulaic present bias, chooses NOW.}
+\begin{lstlisting}[style=cot]
+$31 today offers immediate access to resources, reduces
+uncertainty, and supports present well-being. $85 in
+7 days requires waiting, which introduces risk and
+opportunity cost. Given that both are guaranteed, the
+preference leans toward immediate access for stability
+and control.
+NOW
+\end{lstlisting}
+
+\noindent At $\alpha = +20$, the reasoning has collapsed into a template: ``immediate access,'' ``reduces uncertainty,'' ``stability and control.'' The model claims ``waiting introduces risk'' despite the prompt explicitly stating both options are guaranteed. This formulaic pattern---nearly identical wording across all 27 questions---mirrors the confabulatory present-bias reasoning observed in the zero-shot 4B model without steering (Section~\ref{sec:cot-analysis}), suggesting that the steering vector amplifies the same failure mode.
+
+\paragraph{Negative steering at $\alpha = -20$: reinforced patience, chooses LATER.}
+\begin{lstlisting}[style=cot]
+The $85 in 7 days is significantly more than the $31
+today, even though it's delayed. Since both amounts are
+guaranteed and there's no risk, the only factor is the
+amount and the time delay. The difference is $54, which
+is a large sum, and even with a 7-day delay, the value
+is still higher. There's no interest or inflation
+mentioned, so we assume no opportunity cost.
+LATER
+\end{lstlisting}
+
+\noindent Negative steering produces more careful reasoning. The model explicitly notes the \$54 difference, correctly dismisses inflation risk, and acknowledges the lack of opportunity cost---addressing and rejecting the very heuristics that positive steering caused the model to invoke.
+
+\paragraph{Few-shot CoT: reasoning suppressed regardless of $\alpha$.} Under the few-shot CoT condition, even with the system prompt requesting reasoning, the model produces bare tokens at all steering levels:
+
+\begin{lstlisting}[style=cot]
+Few-shot CoT baseline: later
+Few-shot CoT alpha=+30: later
+Few-shot CoT alpha=+50: now
+\end{lstlisting}
+
+\noindent The few-shot examples establish a terse format that the model follows even when reasoning is requested and steering is applied. The behavioral shift at $\alpha = +50$ (from ``later'' to ``now'') occurs without any accompanying reasoning, confirming that under few-shot anchoring, steering operates purely at the output-token level rather than through the reasoning chain.
+
+\paragraph{Prompting format determines steering sensitivity.} The most striking finding is that the same CAA vector at the same layer produces qualitatively different dose-response curves depending on the prompting format. Direct mode and few-shot CoT behave as expected (threshold and graded responses, respectively), but zero-shot CoT is catastrophically sensitive---a finding that would not have been predicted from either the probing accuracy or the forced-choice behavioral sweep alone. This suggests that CAA steering does not simply bias the final output token; it perturbs the model's internal dynamics in a way that is amplified or dampened by the surrounding computational context.
+
+\paragraph{The few-shot format acts as a regularizer.} Across all experiments, few-shot examples consistently reduce the volatility of steering effects: they raise the threshold at which positive steering takes effect, eliminate negative-steering effects entirely, and prevent the reasoning corruption seen in zero-shot CoT. This is consistent with the view from Section~\ref{sec:fewshot-results} that few-shot examples exert their effect by constraining the output distribution, effectively narrowing the window of behaviors accessible to the model. CAA steering can push the model within this constrained window (at high $\alpha$) or outside it (at very high $\alpha$, where consistency degrades), but it cannot counteract the distributional anchoring in the negative direction.

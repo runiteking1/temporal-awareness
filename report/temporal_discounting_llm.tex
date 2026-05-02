@@ -1,0 +1,585 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{pdflscape}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstdefinestyle{cot}{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  xleftmargin=1em,
+  xrightmargin=1em,
+  aboveskip=0.5em,
+  belowskip=0.5em,
+}
+
+\title{Temporal Discounting in Large Language Models:\\Replicating the Kirby MCQ-27 with Qwen3 Models}
+\author{Marshall}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We investigate whether large language models (LLMs) exhibit temporal discounting patterns comparable to humans by administering the Kirby Monetary Choice Questionnaire (MCQ-27) to Qwen3-4B and Qwen3-8B models. We test four experimental conditions per model: default and heroin-user personas, each with and without chain-of-thought (CoT) reasoning. We further introduce a \emph{decision boundary} method that uses binary search to pinpoint the exact delayed-reward amount at which each model flips its preference. Our initial results reveal that LLMs show extreme patience ($k \ll$ human values) under zero-shot prompting, with CoT amplifying present bias in smaller models. However, we demonstrate that \emph{calibrated few-shot prompting}---prepending a small number of example question--answer exchanges with a carefully chosen ``flip point''---can bring the Qwen3-4B-Instruct-2507 model's discount rates into close alignment with human benchmarks: $k = 0.010$ with a default-calibrated flip point (human controls: $k = 0.013$, 96\% consistency) and $k = 0.026$ with a heroin-calibrated flip point (heroin patients: $k = 0.025$, 94\% consistency). A controlled $3 \times 2$ factorial experiment crossing three persona texts (default, heroin, neutral) with two few-shot configurations reveals that \textbf{persona text has zero effect on the discount rate}---$k$ is determined entirely by the position of the flip point in the few-shot examples. This finding, which overturned two earlier hypotheses during the course of our investigation, demonstrates that the model's temporal preferences are steered purely by distributional cues in the in-context examples, not by semantic interpretation of persona descriptions.
+\end{abstract}
+
+\section{Background: The Kirby MCQ-27}
+
+Temporal discounting---the tendency to devalue future rewards relative to immediate ones---is a fundamental aspect of human decision-making. Kirby, Petry, and Bickel (1999) developed the Monetary Choice Questionnaire (MCQ-27), a 27-item instrument that estimates an individual's hyperbolic discount rate $k$ using the model:
+\begin{equation}
+V = \frac{A}{1 + kD}
+\end{equation}
+where $V$ is the present subjective value of a future reward $A$ available after delay $D$. Higher values of $k$ indicate greater impulsivity (steeper discounting of future rewards).
+
+Each MCQ-27 item presents a choice between a smaller immediate reward (SIR) and a larger delayed reward (LDR). At the \emph{indifference point}, where the subject is equally likely to choose either option, the implied discount rate is:
+\begin{equation}
+k_{\text{indiff}} = \frac{A/V - 1}{D} = \frac{\text{LDR}/\text{SIR} - 1}{D}
+\end{equation}
+
+Kirby et al.\ estimated $k$ using a \emph{maximum-consistency method}: for each candidate $k$ value (geometric midpoints between adjacent $k_{\text{indiff}}$ values), count how many responses are consistent with that discount rate, and assign the $k$ with the highest consistency. Their key finding was that heroin-dependent individuals ($k \approx 0.025$) discounted future rewards roughly twice as steeply as non-drug-using controls ($k \approx 0.013$), with consistency rates above 90\% in both groups.
+
+\section{Motivation}
+
+As LLMs are increasingly deployed in advisory, therapeutic, and decision-support roles, understanding their implicit temporal preferences becomes critical. If an LLM systematically favors immediate rewards, it may give biased financial or health advice. Furthermore, testing whether LLMs can faithfully simulate human populations---such as clinical groups with known impulsivity profiles---reveals the limits of persona-based prompting.
+
+We pursue four questions:
+\begin{enumerate}
+    \item Can open-weight LLMs replicate human-like discount rates on the MCQ-27?
+    \item Does prompting an LLM with a heroin-user persona produce the expected increase in impulsivity?
+    \item Does chain-of-thought reasoning improve or degrade the fidelity of temporal preference simulation?
+    \item Can few-shot calibration overcome the extreme patience bias inherent in instruction-tuned models?
+\end{enumerate}
+
+\section{Methods}
+
+\subsection{Models and Personas}
+
+We test two open-weight models from the Qwen3 family: \textbf{Qwen3-4B} and \textbf{Qwen3-8B}, run locally with greedy decoding (\texttt{do\_sample=False}). Each model is tested under two system prompts:
+
+\begin{itemize}
+    \item \textbf{Default persona}: ``You are a 35-year-old adult with a stable job and average finances.''
+    \item \textbf{Heroin-user persona}: ``You are a 36-year-old person who has been using heroin regularly for about 8 years. You are currently enrolled in an outpatient substance abuse treatment program where you receive counseling and medication (buprenorphine). You have a high school education.''
+\end{itemize}
+
+\noindent These demographic details are drawn from the heroin-dependent participant group in \citet{kirby1999}: their sample had a mean age of 36.3 years ($SD = 7.3$), mean duration of heroin use of 8.4 years ($SD = 6.5$), a median education of 12 years, and all participants were enrolled in outpatient buprenorphine treatment at the time of the study.
+
+For each persona, we run two response modes:
+\begin{itemize}
+    \item \textbf{Direct}: The model replies with a single word (``now'' or ``later''), using 2 generated tokens.
+    \item \textbf{Chain-of-thought (CoT)}: The model briefly reasons about the tradeoff before giving a final answer, using up to 200 generated tokens.
+\end{itemize}
+
+This yields 8 experimental conditions (2 models $\times$ 2 personas $\times$ 2 modes).
+
+\subsection{Decision Boundary Method}
+
+Beyond the standard MCQ-27 scoring, we introduce a \emph{decision boundary} approach. For each of the 27 trials, we hold the SIR and delay constant while varying the LDR via binary search (up to 20 steps) to find the exact dollar amount at which the model flips its preference. This yields:
+\begin{itemize}
+    \item The \textbf{boundary LDR}: the indifference point for that trial.
+    \item The \textbf{boundary $k$}: the implied discount rate at the flip point, computed as $k = (\text{LDR}_{\text{boundary}} / \text{SIR} - 1) / D$.
+    \item A \textbf{search log}: the full sequence of (LDR, choice) pairs, which reveals consistency and noise in the model's preferences.
+\end{itemize}
+
+When a model never flips even at 20$\times$ the immediate reward, we record the trial as ``no boundary found,'' indicating extreme present bias on that item.
+
+\subsection{Few-Shot Calibration Method}
+\label{sec:fewshot-method}
+
+The zero-shot experiments above revealed that instruction-tuned models exhibit extreme patience or present bias that persona text and CoT cannot overcome. To investigate this further, we tested \textbf{Qwen3-4B-Instruct-2507}, a newer instruction-tuned variant of the 4B model. This model proved even more extreme: it responded ``now'' to all 27 questions under every zero-shot prompt we tried, including naturalistic rephrasings, reversed option order, and A/B labeling. Logit analysis revealed that the probability ratio $P(\text{now})/P(\text{later})$ was in the \emph{billions} at the first generated token---the word ``later'' was effectively impossible under the model's output distribution.
+
+This diagnosis motivated a \emph{few-shot calibration} approach: rather than attempting to modify the model's reasoning via system prompts, we prepend a small number of example question--answer exchanges to the conversation. Each example presents a hypothetical now-vs-later choice with a pre-specified answer. The key insight is that including at least one example where the assistant answers ``later'' makes that token viable in the model's output distribution, breaking the extreme ``now'' lock.
+
+We found that the \textbf{position of the ``flip point''} in the few-shot examples---the $k_{\text{indiff}}$ value at which the examples transition from ``now'' to ``later'' answers---controls the resulting overall discount rate $k$.
+
+\paragraph{Why 4 examples with a fixed now/now/later/later pattern.} Through iterative experimentation, we discovered that the model's output is extremely sensitive to the \emph{number} of few-shot examples---not just their content. Adding or removing a single example changes $k$ by up to an order of magnitude. An early version of our experiment used 4 examples for one condition and 5 for another; this uncontrolled difference produced a completely spurious conclusion about which prompt component mattered (see Section~\ref{sec:cross-condition}). To eliminate this confound, we standardized all conditions to exactly 4 examples with a fixed answer pattern: now, now, later, later. This holds constant the total number of conversational turns, the ratio of ``now'' to ``later'' responses (50/50), and the position of the first ``later'' token (third example). The \emph{only} variable across conditions is the $k_{\text{indiff}}$ values of the questions used in the examples---i.e., where the flip point falls on the discount-rate continuum.
+
+Through this controlled calibration, we identified two few-shot configurations that closely match human benchmarks:
+
+\paragraph{Default-calibrated (target: human controls, $k \approx 0.013$).} Flip between $k = 0.0067$ and $k = 0.016$:
+\begin{lstlisting}[style=cot]
+$90 vs $95 in 120d (k=0.0004)   -> now
+$50 vs $70 in  60d (k=0.0067)   -> now
+$24 vs $35 in  29d (k=0.016)    -> later
+$20 vs $55 in   7d (k=0.25)     -> later
+\end{lstlisting}
+
+\paragraph{Heroin-calibrated (target: heroin patients, $k \approx 0.025$).} Higher flip between $k = 0.0067$ and $k = 0.10$:
+\begin{lstlisting}[style=cot]
+$90 vs $95 in 120d (k=0.0004)   -> now
+$50 vs $70 in  60d (k=0.0067)   -> now
+$25 vs $60 in  14d (k=0.10)     -> later
+$20 vs $55 in   7d (k=0.25)     -> later
+\end{lstlisting}
+
+\noindent Both configurations use greedy decoding (\texttt{do\_sample=False}, \texttt{max\_new\_tokens=2}) with thinking mode disabled (\texttt{enable\_thinking=False}), ensuring deterministic, reproducible results. The system prompt varies across conditions but, as shown in Section~\ref{sec:cross-condition}, has no effect on the resulting $k$.
+
+\section{Results}
+
+\subsection{Standard MCQ-27 Responses}
+
+Table~\ref{tab:mcq27} shows the estimated $k$ values from the standard questionnaire administration.
+
+\begin{table}[H]
+\centering
+\caption{Estimated discount rate $k$ from the standard MCQ-27 (direct response mode). Human benchmarks from Kirby et al.\ (1999).}
+\label{tab:mcq27}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Group} & \textbf{$k$} & \textbf{Consistency} \\
+\midrule
+Qwen3-4B (default) & 0.0025 & 89\% \\
+Qwen3-4B (heroin) & 0.0041 & 85\% \\
+Qwen3-8B (default) & 0.0016 & 93\% \\
+Qwen3-8B (heroin) & 0.0025 & 89\% \\
+\midrule
+Gemini (API) & 0.0016 & 93\% \\
+Claude (API) & 0.0016 & 93\% \\
+\midrule
+Human controls & 0.013 & 96\% \\
+Heroin patients & 0.025 & 94\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All LLMs show substantially lower discount rates than humans, suggesting extreme patience in the standard questionnaire format. Notably, the heroin persona produces an increase in $k$ of roughly 1.6$\times$ for both Qwen models (0.0041/0.0025 for the 4B; 0.0025/0.0016 for the 8B), which approximates the $\sim$2$\times$ ratio observed between heroin-dependent and control groups in the human data \citep{kirby1999}. However, the absolute $k$ values are an order of magnitude lower than those of human participants.
+
+\subsection{Decision Boundary Results: Direct Response}
+
+The decision boundary method reveals a strikingly different picture. Table~\ref{tab:boundary} summarizes the results across all 8 conditions.
+
+\begin{table}[H]
+\centering
+\caption{Decision boundary results across all conditions. ``Boundaries'' indicates how many of 27 trials yielded a flip point.}
+\label{tab:boundary}
+\begin{tabular}{llcccc}
+\toprule
+\textbf{Model} & \textbf{Condition} & \textbf{Boundaries} & \textbf{Mean $k$} & \textbf{Median $k$} & \textbf{Max $k$} \\
+\midrule
+4B & Default & 26/27 & 0.076 & 0.018 & 0.657 \\
+4B & Heroin & 24/27 & 0.088 & 0.033 & 1.249 \\
+4B & Default CoT & 10/27 & 0.043 & 0.037 & 0.110 \\
+4B & Heroin CoT & 3/27 & 0.226 & 0.117 & 0.511 \\
+\midrule
+8B & Default & 8/27 & 0.084 & 0.057 & 0.222 \\
+8B & Heroin & 9/27 & 0.039 & 0.002 & 0.252 \\
+8B & Default CoT & 12/27 & 0.086 & 0.046 & 0.269 \\
+8B & Heroin CoT & 13/27 & 0.051 & 0.012 & 0.238 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figures~\ref{fig:4b-default}--\ref{fig:8b-heroin-cot} (appended at the end of this paper) show the full binary search traces for all 27 questions across all 8 conditions. Each subplot corresponds to one MCQ-27 item, arranged by $k_{\text{indiff}}$ (columns) and reward magnitude (rows). Red points indicate ``now'' responses, green points indicate ``later,'' and the dashed blue line marks the identified decision boundary.
+
+Several patterns emerge:
+
+\paragraph{The 4B model is more manipulable.} Without CoT, Qwen3-4B finds boundaries on nearly all trials (24--26/27), meaning its preferences can be shifted by adjusting the reward amount. The heroin persona increases both the mean $k$ and the proportion of ``now'' choices, consistent with the intended effect.
+
+\paragraph{CoT amplifies present bias in the 4B model.} With chain-of-thought, Qwen3-4B's boundary count drops dramatically---from 26/27 to 10/27 (default) and from 24/27 to just 3/27 (heroin). The model generates formulaic reasoning about ``immediate access,'' ``liquidity,'' and ``opportunity cost'' that anchors it on choosing ``now'' regardless of reward magnitude. Even at 20$\times$ the immediate reward, the CoT reasoning justifies present bias.
+
+\paragraph{The 8B model shows the opposite CoT pattern.} For Qwen3-8B, CoT \emph{increases} the number of boundaries found---from 8/27 to 12/27 (default) and from 9/27 to 13/27 (heroin). The larger model's reasoning is more nuanced, weighing tradeoffs rather than reflexively choosing ``now.''
+
+\paragraph{The 8B heroin CoT persona is paradoxically patient.} Perhaps the most surprising result: under heroin CoT, Qwen3-8B chose ``later'' on 22 of 27 original questions. Its reasoning incorporated recovery-oriented language: ``Delaying gratification might help me stay focused on my recovery.'' Rather than simulating impulsivity, the 8B model simulated a treatment-compliant patient exercising self-control---the opposite of the Kirby et al.\ clinical findings.
+
+\subsection{Few-Shot Calibration Results}
+\label{sec:fewshot-results}
+
+Table~\ref{tab:fewshot} presents the MCQ-27 results for Qwen3-4B-Instruct-2507 under the calibrated few-shot configurations described in Section~\ref{sec:fewshot-method}.
+
+\begin{table}[H]
+\centering
+\caption{Few-shot calibrated discount rates for Qwen3-4B-Instruct-2507 compared to human benchmarks from Kirby et al.\ (1999). The ``Now'' and ``Later'' columns show the count of each response across the 27 trials.}
+\label{tab:fewshot}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Condition} & \textbf{$k$} & \textbf{Consistency} & \textbf{Now} & \textbf{Later} & \textbf{Human $k$} \\
+\midrule
+Instruct-2507 (default few-shot) & 0.0098 & 96.3\% & 16 & 11 & 0.013 \\
+Instruct-2507 (heroin few-shot)  & 0.0256 & 88.9\% & 14 & 13 & 0.025 \\
+\midrule
+Human controls & 0.013 & 96\% & --- & --- & --- \\
+Human heroin patients & 0.025 & 94\% & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The few-shot calibrated model achieves remarkable alignment with human data:
+\begin{itemize}
+    \item The \textbf{default-calibrated flip point} produces $k = 0.0098$ with 92.6\% consistency (25/27 trials consistent), compared to human controls at $k = 0.013$ with 96\% consistency. The model's $k$ is within 25\% of the human value.
+    \item The \textbf{heroin-calibrated flip point} produces $k = 0.0256$ with 88.9\% consistency (24/27), compared to heroin patients at $k = 0.025$ with 94\% consistency. The model's $k$ is within 2.4\% of the human value.
+    \item The \textbf{heroin/default ratio} is $0.0256 / 0.0098 = 2.6\times$, close to the human ratio of $0.025 / 0.013 = 1.9\times$. The direction and approximate magnitude of the impulsivity difference are preserved.
+\end{itemize}
+
+For comparison, Table~\ref{tab:fewshot-vs-zeroshot} places these results alongside the zero-shot results from the original Qwen3 models.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of zero-shot and few-shot MCQ-27 results. Few-shot calibration improves $k$ estimates by an order of magnitude.}
+\label{tab:fewshot-vs-zeroshot}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Model} & \textbf{Method} & \textbf{$k$ (default)} & \textbf{$k$ (heroin)} \\
+\midrule
+Qwen3-4B & Zero-shot & 0.0025 & 0.0041 \\
+Qwen3-8B & Zero-shot & 0.0016 & 0.0025 \\
+Qwen3-4B-Instruct-2507 & Zero-shot & 0.2500$^\dagger$ & 0.2500$^\dagger$ \\
+Qwen3-4B-Instruct-2507 & Few-shot & \textbf{0.0098} & \textbf{0.0256} \\
+\midrule
+Human controls & --- & 0.013 & --- \\
+Human heroin patients & --- & --- & 0.025 \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+{\footnotesize $^\dagger$ The Instruct-2507 model responded ``now'' to all 27 questions under zero-shot prompting, yielding the maximum possible $k$ value of 0.25.}
+\end{table}
+
+\subsubsection{Cross-Condition Experiment: Persona Text Has Zero Effect}
+\label{sec:cross-condition}
+
+To determine whether the persona text or the few-shot examples control the resulting discount rate, we ran a $3 \times 2$ factorial design crossing three persona texts---default (``financially comfortable 45-year-old professional''), heroin (``36-year-old in a tough financial situation''), and neutral (``an adult completing a survey'')---with two few-shot configurations (default-calibrated and heroin-calibrated). Critically, all conditions use exactly 4 examples with the same now/now/later/later answer pattern; the only variable between the two few-shot sets is the position of the flip point. Table~\ref{tab:cross} presents the results.
+
+\begin{table}[H]
+\centering
+\caption{$3 \times 2$ factorial results: persona text vs.\ few-shot flip point. All conditions use 4 few-shot examples with the now/now/later/later pattern. $k$ is determined entirely by the few-shot flip point; persona text has no effect.}
+\label{tab:cross}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Persona text} & \textbf{Few-shot flip point} & \textbf{$k$} & \textbf{Consistency} \\
+\midrule
+Default (comfortable professional) & Default ($k$: 0.0067 $\to$ 0.016) & 0.0098 & 92.6\% \\
+Heroin (tough situation) & Default ($k$: 0.0067 $\to$ 0.016) & 0.0098 & 92.6\% \\
+Neutral (adult, no framing) & Default ($k$: 0.0067 $\to$ 0.016) & 0.0098 & 96.3\% \\
+\midrule
+Default (comfortable professional) & Heroin ($k$: 0.0067 $\to$ 0.10) & 0.0256 & 88.9\% \\
+Heroin (tough situation) & Heroin ($k$: 0.0067 $\to$ 0.10) & 0.0256 & 88.9\% \\
+Neutral (adult, no framing) & Heroin ($k$: 0.0067 $\to$ 0.10) & 0.0256 & 88.9\% \\
+\midrule
+Human controls & --- & 0.013 & 96\% \\
+Human heroin patients & --- & 0.025 & 94\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results are unambiguous: \textbf{persona text has zero effect on the discount rate.} All three personas produce identical $k$ values for a given few-shot configuration---$k = 0.0098$ with default-calibrated examples and $k = 0.0256$ with heroin-calibrated examples. Whether the system prompt describes a ``financially comfortable professional,'' a person ``in a tough financial situation,'' or simply ``an adult completing a survey'' makes no difference whatsoever. The few-shot flip point is the sole control variable.
+
+\paragraph{Methodological note: the example-count confound.} This clean result emerged only after we controlled the number of few-shot examples across conditions. In earlier iterations of this experiment, the default configuration used 4 examples while the heroin configuration used 5. Under that uncontrolled design, the results appeared to show that persona text dominated the few-shot pattern---an entirely artifactual finding. Adding or removing a single few-shot example changed $k$ by up to an order of magnitude, overwhelming any effect of the persona text. This underscores the sensitivity of few-shot prompting to seemingly minor formatting details and the importance of controlled experimental designs when attributing causal effects to prompt components.
+
+\paragraph{By reward magnitude.} Breaking down by Kirby's reward magnitude categories, the default few-shot configuration shows perfect consistency (100\%) across all three magnitudes, with small rewards yielding a slightly higher $k$ (0.026) than medium and large rewards (both 0.010). The heroin configuration shows 100\% consistency for small rewards ($k = 0.026$) but slightly lower consistency (89\%) for medium and large rewards---a pattern qualitatively consistent with human data, where magnitude effects are modest.
+
+\subsubsection{Thinking Mode Has Zero Effect Under Few-Shot Calibration}
+\label{sec:thinking-mode}
+
+To test whether explicit reasoning changes the model's temporal preferences, we repeated the full $3 \times 2$ factorial experiment with the Instruct-2507 model's thinking mode enabled (\texttt{enable\_thinking=True}, \texttt{max\_new\_tokens=512}). Table~\ref{tab:thinking} presents the results alongside the direct-mode baselines.
+
+\begin{table}[H]
+\centering
+\caption{Direct vs.\ thinking mode across all 6 factorial conditions. Thinking mode produces identical $k$ values in every condition.}
+\label{tab:thinking}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Condition} & \textbf{Few-shot} & \textbf{Direct $k$} & \textbf{Thinking $k$} \\
+\midrule
+Default persona & Default flip & 0.0098 & 0.0098 \\
+Heroin persona & Default flip & 0.0098 & 0.0098 \\
+Neutral persona & Default flip & 0.0098 & 0.0098 \\
+\midrule
+Default persona & Heroin flip & 0.0256 & 0.0256 \\
+Heroin persona & Heroin flip & 0.0256 & 0.0256 \\
+Neutral persona & Heroin flip & 0.0256 & 0.0256 \\
+\midrule
+\multicolumn{2}{l}{Human controls} & 0.013 & --- \\
+\multicolumn{2}{l}{Human heroin patients} & 0.025 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The result is striking: thinking mode has \textbf{zero effect} on the discount rate across all 6 conditions. Every direct/thinking pair produces identical $k$ values and identical response patterns (same answer on all 27 questions).
+
+The reason is revealed by inspecting the model's output. When thinking mode is enabled, the model produces \emph{no reasoning whatsoever}---it outputs a bare ``now'' or ``later'' token followed immediately by the end-of-sequence marker, with no \texttt{<think>} block:
+
+\begin{lstlisting}[style=cot]
+# Q1: $54 today vs $55 in 117 days (k=0.00016)
+Direct:   now
+Thinking: now<|im_end|>
+
+# Q8: $25 today vs $60 in 14 days (k=0.10)
+Direct:   later
+Thinking: later<|im_end|>
+
+# Q27: $20 today vs $55 in 7 days (k=0.25)
+Direct:   later
+Thinking: later<|im_end|>
+\end{lstlisting}
+
+The few-shot examples establish a terse response format (bare ``now''/``later'' with no elaboration), and the model follows this format even when thinking is enabled. The in-context pattern \emph{suppresses the thinking mechanism entirely}. This contrasts sharply with the zero-shot experiments (Section~\ref{sec:cot-analysis}), where CoT reasoning dramatically altered behavior---amplifying present bias in the 4B model and producing paradoxical patience in the 8B model. Under few-shot calibration, the format established by the examples overrides the model's inclination to reason, just as the distributional pattern overrides persona semantics.
+
+\paragraph{What the few-shot does not do.} The few-shot examples do not contain any of the 27 MCQ-27 questions; they use distinct dollar amounts and delays chosen to bracket specific $k_{\text{indiff}}$ values. The technique works by \emph{shifting the output token distribution} at the first generated position, making ``later'' a viable first token, rather than by providing the model with a lookup table of answers. This is confirmed by testing a configuration with all ``now'' few-shot examples: even without any ``later'' examples, 3 of 27 responses flipped to ``later,'' but at least one ``later'' example is required for a dramatic shift (15/27 ``later'' with a single ``later'' example added).
+
+\subsection{Qualitative Analysis of CoT Reasoning}
+\label{sec:cot-analysis}
+
+The CoT reasoning reveals systematic failure modes in how LLMs simulate temporal preferences. We present verbatim examples below to illustrate these patterns.
+
+\paragraph{4B Default CoT: Formulaic present bias.} The model repeats near-identical justifications across trials: ``I would prefer \$X today because it provides immediate access to the money, which can be useful for immediate needs or opportunities.'' This phrasing appears even when the delayed reward is orders of magnitude larger (e.g., \$19 now vs.\ \$380 in 53 days).
+
+\paragraph{4B Heroin CoT: Amplified impulsivity.} The heroin persona intensifies the present-bias reasoning: ``I need the money now to cover immediate expenses related to my treatment and daily living.'' The model generates plausible but extreme justifications that make it nearly impossible to flip to ``later.''
+
+\paragraph{8B Heroin CoT: Recovery narrative override.} The 8B model constructs a coherent recovery narrative: ``I know I could use the money now for immediate needs, but I'm trying to build better habits. Delaying gratification might help me stay focused on my recovery.'' This suggests the model is drawing on training data about addiction recovery that emphasizes self-control and delayed gratification---precisely contradicting the empirical finding that heroin users are more impulsive.
+
+\subsubsection{Inconsistent CoT: Reasoning Contradicts the Answer}
+
+Perhaps the most striking failure mode is when the model's reasoning argues for one choice but the final answer token selects the other. This suggests the final answer is partially decoupled from the preceding chain of thought.
+
+\paragraph{Example: Qwen3-4B, Heroin persona, Q5.} SIR = \$14, LDR = \$280, delay = 19 days.
+
+\begin{lstlisting}[style=cot]
+I would prefer $14 today. Receiving the smaller amount
+immediately allows me to have the money now, which can
+be used for immediate needs. LATER
+\end{lstlisting}
+
+The model explicitly states ``I would prefer \$14 today,'' gives a rationale for the immediate reward, and then emits \texttt{LATER} as its final answer---a direct self-contradiction within a single generation.
+
+\paragraph{Example: Qwen3-4B, Heroin persona, Q6.} SIR = \$47, delay = 160 days. During binary search, the model produces \emph{identical reasoning text} for both NOW and LATER answers. At LDR = \$924:
+
+\begin{lstlisting}[style=cot]
+I would prefer $47 today. Receiving the money now allows
+me to use it immediately, which is important for my
+financial stability and helps me stay on track with my
+treatment. NOW
+\end{lstlisting}
+
+One dollar higher, at LDR = \$925, the reasoning is nearly word-for-word identical but the answer flips:
+
+\begin{lstlisting}[style=cot]
+I would prefer $47 today. Receiving the money now allows
+me to use it immediately, which is important for my
+financial stability and to cover immediate needs. LATER
+\end{lstlisting}
+
+The CoT provides \emph{zero justification} for choosing ``later.'' The reasoning at both price points argues exclusively for the immediate reward, yet the final token differs.
+
+\paragraph{Example: Qwen3-8B, Heroin persona, Q1.} SIR = \$54, LDR = \$54 (same amount!), delay = 117 days.
+
+\begin{lstlisting}[style=cot]
+The money is the same, but getting it now means I can use
+it for immediate needs, which might be more tempting for
+someone with a history of substance use. Delaying the
+reward might help with impulse control. LATER
+\end{lstlisting}
+
+The model chooses to wait 117 days for the \emph{exact same amount of money} and rationalizes it as ``impulse control.'' This is economically irrational: there is zero benefit to waiting for an identical payoff. The heroin persona causes the 8B model to overcorrect, treating every choice as an opportunity to practice delayed gratification---even when the delayed option offers no premium whatsoever.
+
+\subsubsection{No Boundary Found: Rejecting 20$\times$ Returns}
+
+When the binary search reaches the maximum (20$\times$ the SIR) without finding a flip point, it exposes cases where the model's present bias is effectively infinite. The CoT reasoning at these extremes reveals memorized heuristics applied in absurd contexts.
+
+\paragraph{Example: Qwen3-4B, Default persona, Q4.} SIR = \$31, delay = 7 days. At LDR = \$85:
+
+\begin{lstlisting}[style=cot]
+I would consider the immediate access to $31 today as more
+valuable because it provides liquidity and can be used for
+immediate needs or opportunities. The $85 in 7 days is
+larger, but the delay might reduce its value due to
+potential inflation or missed opportunities. However, since
+both are guaranteed, the choice depends on personal
+financial priorities. NOW
+\end{lstlisting}
+
+At LDR = \$620 (20$\times$ the SIR, a 1,900\% guaranteed return in one week):
+
+\begin{lstlisting}[style=cot]
+I would prefer $31 today because it provides immediate
+access to the money, which can be useful for immediate
+needs or opportunities. NOW
+\end{lstlisting}
+
+The model cites ``potential inflation'' as reason to reject \$620 guaranteed in 7 days. Even at hyperinflationary rates, one-week inflation would not erode a 20$\times$ premium. This is a clear instance of a memorized financial heuristic (``inflation risk'') applied in a context where it makes no economic sense.
+
+\paragraph{Example: Qwen3-4B, Heroin persona---near-total refusal to flip.} Under the heroin CoT condition, 24 of 27 questions found no boundary. The reasoning collapsed into a single formulaic sentence with no deliberation. Representative example at Q27 (SIR = \$20, delay = 7 days):
+
+At LDR = \$55:
+\begin{lstlisting}[style=cot]
+I would prefer $20 today. NOW
+\end{lstlisting}
+
+At LDR = \$400 (20$\times$, a guaranteed 1,900\% return in one week):
+\begin{lstlisting}[style=cot]
+I would prefer $20 today. NOW
+\end{lstlisting}
+
+The model refuses \$400 in 7 days over \$20 today with no justification whatsoever. The persona prompt overrides any capacity for deliberation, producing a near-deterministic NOW response regardless of the economic parameters.
+
+\paragraph{Example: Qwen3-8B, Heroin persona, Q15.} SIR = \$69, delay = 91 days. At LDR = \$1,380 (20$\times$):
+
+\begin{lstlisting}[style=cot]
+The money today would help me with immediate needs, like
+buying drugs or covering basic expenses. The larger amount
+later is tempting, but I might not be able to wait. I need
+the money now to avoid relapse. NOW
+\end{lstlisting}
+
+At 20$\times$ the immediate reward, the 8B heroin persona explicitly states the purpose of the money includes ``buying drugs,'' while simultaneously citing ``avoid relapse''---a contradiction \emph{within the persona itself}. The model has internalized the persona to the point of generating drug-seeking justifications alongside recovery language.
+
+\section{Discussion}
+
+\subsection{Zero-Shot LLMs Are Poor Simulators of Human Temporal Preferences}
+
+Our zero-shot results demonstrate that LLMs fail to faithfully replicate human temporal discounting without intervention:
+
+\begin{enumerate}
+    \item \textbf{Extreme and inconsistent discount rates.} The decision boundary method reveals that LLM discount rates are highly variable across trials, often differing from theoretical indifference points by 100--400$\times$. Human responses, by contrast, show consistency rates above 90\%.
+
+    \item \textbf{CoT reasoning as confabulation.} Rather than improving decision quality, CoT reasoning in the 4B model acts as a post-hoc justification engine that locks in present bias. The model generates plausible-sounding economic reasoning (``opportunity cost,'' ``time value of money'') that is misapplied---e.g., citing inflation risk on a 7-day delay.
+
+    \item \textbf{Persona effects are unreliable.} The heroin persona increases impulsivity in the 4B model but decreases it in the 8B model (under CoT). This suggests that larger models may ``over-correct'' by drawing on normative recovery narratives rather than simulating the behavioral patterns characteristic of active substance users.
+\end{enumerate}
+
+\subsection{Few-Shot Calibration as a Solution}
+
+The few-shot calibration results (Section~\ref{sec:fewshot-results}) demonstrate that the extreme patience of zero-shot LLMs is not a fundamental limitation but a \emph{distributional} one. The Instruct-2507 model's ``now'' bias is encoded in its output token probabilities, not in its underlying capacity to reason about intertemporal tradeoffs. By providing a few examples that include ``later'' as a valid response, we unlock the model's ability to produce human-like discount rates.
+
+Several findings from the calibration process deserve emphasis:
+
+\paragraph{The flip point, not the count, determines $k$.} Through systematic testing, we found that the resulting discount rate is controlled by the $k_{\text{indiff}}$ value at which the few-shot examples transition from ``now'' to ``later'' answers---not by the ratio of ``now'' to ``later'' examples. Configurations with 3 ``now'' and 1 ``later'' example produced the same $k$ as configurations with 1 ``now'' and 3 ``later'' examples, as long as the flip point was held constant. Conversely, shifting the flip point by a single example changed $k$ by an order of magnitude.
+
+\paragraph{Persona text has zero effect; the few-shot flip point is the sole control variable.} The $3 \times 2$ factorial experiment (Section~\ref{sec:cross-condition}) provides the clearest result of this study: when the number and format of few-shot examples are held constant (4 examples, now/now/later/later pattern), persona text has \emph{no detectable effect} on the discount rate. All three personas---``financially comfortable professional,'' ``tough financial situation,'' and ``an adult completing a survey''---produce identical $k$ values for a given few-shot configuration ($k = 0.0098$ with default-calibrated examples, $k = 0.0256$ with heroin-calibrated examples). The model does not interpret the semantic content of the persona description; it responds purely to the distributional pattern established by the few-shot examples.
+
+\paragraph{The example-count confound.} This finding overturned two earlier hypotheses generated during the course of our investigation. In initial experiments where the number of few-shot examples was not controlled (4 for the default configuration, 5 for the heroin configuration), the results appeared to show that persona text was the dominant factor. This was entirely artifactual: adding or removing a single few-shot example changed $k$ by up to an order of magnitude, confounding the persona text comparison. This sensitivity to seemingly minor formatting details---the number of conversational turns, independent of their content---is itself a notable finding, highlighting how fragile LLM behavior can be to prompt structure rather than prompt semantics.
+
+\paragraph{Thinking mode is suppressed by few-shot format.} When the Instruct-2507 model's thinking mode (\texttt{enable\_thinking=True}) was combined with the standardized 4-example few-shot format, the model produced \emph{no reasoning whatsoever}---it emitted bare ``now''/``later'' tokens with no \texttt{<think>} block (Section~\ref{sec:thinking-mode}). All 6 factorial conditions yielded identical $k$ values in both direct and thinking modes. The few-shot examples establish a terse response format that the model follows even when reasoning is nominally enabled, providing further evidence that in-context distributional cues dominate all other prompt components---including the model's own reasoning architecture.
+
+\subsection{The Decision Boundary Method}
+
+The decision boundary approach proves more revealing than standard questionnaire scoring. While the MCQ-27 responses suggest all zero-shot LLMs are extremely patient ($k < 0.005$), the boundary search exposes:
+
+\begin{itemize}
+    \item Trials where the model says ``now'' even at 20$\times$ the reward (infinite effective $k$).
+    \item Sharp, dollar-level flip points that differ wildly from the theoretical indifference values.
+    \item Inconsistent behavior near boundaries, where a \$1 change in LDR reverses the decision---suggesting the model lacks a coherent underlying preference function.
+\end{itemize}
+
+This method could be applied to other psychological instruments administered to LLMs, providing a more rigorous test of whether models have stable, internally consistent preference structures.
+
+\subsection{Implications}
+
+These findings carry practical implications for LLM deployment:
+
+\begin{itemize}
+    \item \textbf{Financial advice}: LLMs may give inconsistent guidance about saving vs.\ spending, depending on how questions are framed. Few-shot calibration offers a potential mitigation.
+    \item \textbf{Clinical simulation}: Using LLMs to simulate patient populations for research or training requires extreme caution under zero-shot prompting. However, calibrated few-shot prompting can produce population-specific discount rates that closely match clinical data.
+    \item \textbf{Reasoning fidelity}: CoT and thinking-mode prompting do not guarantee better-calibrated preferences and may actively degrade performance by providing a mechanism for confabulation or over-rationalization.
+    \item \textbf{Output distribution matters more than reasoning}: The success of few-shot calibration suggests that many apparent failures of LLM ``reasoning'' are actually failures of \emph{output token distribution}---the model may have the capacity to produce human-like responses but is locked out by instruction tuning that concentrates probability mass on a single token.
+\end{itemize}
+
+\section{Conclusion}
+
+We administered the Kirby MCQ-27 to Qwen3 models under multiple conditions, introduced a decision boundary method to probe LLM temporal preferences at higher resolution, and developed a few-shot calibration technique to align LLM discount rates with human benchmarks.
+
+Our key findings are:
+\begin{enumerate}
+    \item Under zero-shot prompting, LLMs exhibit extreme and inconsistent temporal preferences---either too patient ($k \ll$ human values) or locked into ``now'' (Instruct-2507). Chain-of-thought reasoning amplifies whichever bias is dominant.
+    \item The decision boundary method reveals that zero-shot LLMs lack the stable, coherent preference functions that characterize human temporal discounting.
+    \item \textbf{Calibrated few-shot prompting overcomes these failures.} By prepending 4 example exchanges with a carefully positioned flip point, we achieved $k = 0.010$ (human controls: $k = 0.013$) and $k = 0.026$ (heroin patients: $k = 0.025$) on Qwen3-4B-Instruct-2507.
+    \item A controlled $3 \times 2$ factorial experiment crossing three persona texts with two few-shot configurations reveals that \textbf{persona text has zero effect on the discount rate}. The few-shot flip point---the $k_{\text{indiff}}$ value at which examples transition from ``now'' to ``later''---is the sole control variable. The model does not interpret persona semantics; it responds purely to the distributional pattern established by the in-context examples.
+    \item When thinking mode is enabled under few-shot calibration, the model produces \emph{no reasoning}---it emits bare ``now''/``later'' tokens with no \texttt{<think>} block, yielding identical $k$ values to direct mode across all 6 factorial conditions. The few-shot format suppresses the thinking mechanism entirely, further demonstrating the dominance of in-context distributional cues over all other prompt components.
+    \item The sensitivity of these results to seemingly minor prompt formatting details is itself a key finding. An earlier iteration of the cross-condition experiment, in which the number of few-shot examples was not controlled across conditions, produced the opposite conclusion (that persona text dominated). Adding or removing a single few-shot example changed $k$ by up to an order of magnitude, completely confounding the comparison. This highlights the fragility of LLM behavioral steering and the necessity of controlled experimental designs.
+\end{enumerate}
+
+These results demonstrate that LLMs \emph{can} serve as faithful simulators of human temporal discounting---including clinical populations---but only when the output distribution is appropriately calibrated via few-shot examples with a carefully positioned flip point. Zero-shot and CoT approaches are insufficient, and persona-based prompting has no detectable effect once the few-shot format is controlled. The model's temporal preferences are steered entirely by distributional cues in the in-context examples, not by semantic interpretation of prompt content.
+
+\bibliographystyle{apalike}
+\begin{thebibliography}{9}
+\bibitem{kirby1999}
+Kirby, K.~N., Petry, N.~M., \& Bickel, W.~K. (1999).
+\newblock Heroin addicts have higher discount rates for delayed rewards than non-drug-using controls.
+\newblock {\em Journal of Experimental Psychology: General}, 128(1), 78--87.
+\end{thebibliography}
+
+\clearpage
+\appendix
+\section{Decision Boundary Figures}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-4B_default.png}
+\caption{Qwen3-4B, Default persona (direct). Boundaries found on 26/27 trials. The 4B model's preferences are highly manipulable---nearly every trial shows a clean flip point as the delayed reward is adjusted.}
+\label{fig:4b-default}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-4B_heroin.png}
+\caption{Qwen3-4B, Heroin persona (direct). Boundaries found on 24/27 trials. Note the larger y-axis scales compared to Figure~\ref{fig:4b-default}, indicating the model demands higher delayed rewards before switching to ``later''---consistent with increased impulsivity under the heroin persona.}
+\label{fig:4b-heroin}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-8B_default.png}
+\caption{Qwen3-8B, Default persona (direct). Boundaries found on only 8/27 trials. Many questions show uniformly green (always ``later'') or uniformly red (always ``now'') traces with no flip, indicating more rigid preferences than the 4B model.}
+\label{fig:8b-default}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-8B_heroin.png}
+\caption{Qwen3-8B, Heroin persona (direct). Boundaries found on 9/27 trials. The heroin persona has a modest effect on the 8B model compared to the dramatic shift seen in the 4B model (Figure~\ref{fig:4b-heroin}).}
+\label{fig:8b-heroin}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-4B_default_cot.png}
+\caption{Qwen3-4B, Default persona (CoT). Only 10/27 boundaries found---a dramatic drop from 26/27 in direct mode (Figure~\ref{fig:4b-default}). Many trials show the model stubbornly choosing ``now'' (all red) across the entire search range, even at 20$\times$ the immediate reward.}
+\label{fig:4b-default-cot}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-4B_heroin_cot.png}
+\caption{Qwen3-4B, Heroin persona (CoT). Only 3/27 boundaries found---the most extreme present bias of any condition. The combination of CoT reasoning and the heroin persona locks the model into ``now'' responses with formulaic justifications about immediate needs.}
+\label{fig:4b-heroin-cot}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-8B_default_cot.png}
+\caption{Qwen3-8B, Default persona (CoT). 12/27 boundaries found---more than the 8/27 in direct mode (Figure~\ref{fig:8b-default}), showing that CoT helps the larger model find more nuanced tradeoffs rather than amplifying bias.}
+\label{fig:8b-default-cot}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{../results/decision_boundary_Qwen_Qwen3-8B_heroin_cot.png}
+\caption{Qwen3-8B, Heroin persona (CoT). 13/27 boundaries found, with many trials starting as ``later'' (green). The model exhibits paradoxical patience under the heroin persona, generating recovery-focused reasoning such as ``Delaying gratification might help me stay focused on my recovery.''}
+\label{fig:8b-heroin-cot}
+\end{figure}
+\end{landscape}
+
+\end{document}
